@@ -3,15 +3,14 @@
 namespace tests\Clearcode\EHLibrarySandbox;
 
 use Silex\WebTestCase as BaseWebTestCase;
-use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\HttpKernel\Client;
 
 abstract class WebTestCase extends BaseWebTestCase
 {
     /** @var Client */
     protected $client;
-    /** @var Crawler*/
-    protected $crawler;
+    /** @var array */
+    protected $jsonResponseData;
 
     /** {@inheritdoc} */
     public function setUp()
@@ -36,7 +35,7 @@ abstract class WebTestCase extends BaseWebTestCase
     protected function tearDown()
     {
         $this->client = null;
-        $this->crawler = null;
+        $this->jsonResponseData = null;
 
         parent::tearDown();
     }
@@ -48,7 +47,9 @@ abstract class WebTestCase extends BaseWebTestCase
 
     protected function visit($method, $url, $requestParameters = array())
     {
-        $this->crawler = $this->client->request($method, $url, $requestParameters);
+        $this->client->request($method, $url, $requestParameters);
+
+        $this->jsonResponseData = json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 
     protected function assertThatResponseHasStatus($status)
