@@ -1,6 +1,6 @@
 <?php
 
-use Clearcode\EHLibrarySandbox\Controller\AppController;
+use Clearcode\EHLibrarySandbox\Silex\Controller\AppController;
 use Silex\Application;
 use Silex\Provider\HttpFragmentServiceProvider;
 use Silex\Provider\ServiceControllerServiceProvider;
@@ -16,7 +16,7 @@ $app['root_dir'] = $app->share(function () {
 });
 
 $app['app.controller'] = $app->share(function () use ($app) {
-    return new AppController($app);
+    return new AppController();
 });
 
 return $app;

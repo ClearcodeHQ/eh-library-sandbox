@@ -1,95 +1,100 @@
 <?php
 
-namespace Clearcode\EHLibrarySandbox\Controller;
+namespace Clearcode\EHLibrarySandbox\Silex\Controller;
 
-use Clearcode\EHLibrary\Application\UseCase\AddBookToLibrary;
-use Clearcode\EHLibrary\Application\UseCase\CreateReservation;
-use Clearcode\EHLibrary\Application\UseCase\GiveAwayBookInReservation;
-use Clearcode\EHLibrary\Application\UseCase\GiveBackBookFromReservation;
-use Clearcode\EHLibrary\Infrastructure\Persistence\LocalBookRepository;
-use Clearcode\EHLibrary\Infrastructure\Persistence\LocalReservationRepository;
-use Clearcode\EHLibrary\Infrastructure\Projection\LocalListOfBooksProjection;
+use Clearcode\EHLibrary\Application;
 use Clearcode\EHLibrary\Infrastructure\Projection\LocalListReservationsForBookProjection;
+use Clearcode\EHLibrary\Library;
+use Clearcode\EHLibrary\Model\BookInReservationAlreadyGivenAway;
 use Ramsey\Uuid\Uuid;
-use Silex\Application;
+use Silex\Application as SilexApplication;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 class AppController
 {
-    /** @var Application  */
-    private $app;
+    /** @var Library */
+    private $library;
 
-    /**
-     * @param Application $app
-     */
-    public function __construct(Application $app)
+    public function __construct()
     {
-        $this->app = $app;
+        $this->library = new Application();
     }
 
     /**
+     * @param Request $request
+     * @param string  $bookId
      * @return JsonResponse
      */
-    public function postBooksAction()
+    public function putBooksAction(Request $request, $bookId)
     {
-        $useCase = new AddBookToLibrary(new LocalBookRepository());
-        $useCase->add(Uuid::uuid4()->toString(), 'Lorem ipsum', 'Lorem ipsum', 'Lorem ipsum');
+        if (null === $request->request->get('title') || null === $request->request->get('authors') || null === $request->request->get('isbn')) {
+            return new JsonResponse(null, Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->library->addBook(Uuid::fromString($bookId), $request->request->get('title'), $request->request->get('authors'), $request->request->get('isbn'));
+
+        return new JsonResponse(['id' => $bookId], Response::HTTP_CREATED);
+    }
+
+    /**
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function getBooksAction(Request $request)
+    {
+        return new JsonResponse($this->library->listOfBooks($request->query->get('page', 1), $request->query->get('booksPerPage')));
+    }
+
+    /**
+     * @param Request $request
+     * @param string  $bookId
+     * @return JsonResponse
+     */
+    public function postReservationsAction(Request $request, $bookId)
+    {
+        if (null === $request->request->get('email')) {
+            return new JsonResponse(null, Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->library->createReservation(Uuid::fromString($bookId), $request->request->get('email'));
 
         return new JsonResponse(null, Response::HTTP_CREATED);
     }
 
     /**
+     * @param $reservationId
      * @return JsonResponse
      */
-    public function getBooksAction()
+    public function patchReservationsAction($reservationId)
     {
-        return new JsonResponse((new LocalListOfBooksProjection())->get());
-    }
-
-    /**
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function postReservationsAction(Request $request)
-    {
-        $useCase = new CreateReservation(new LocalReservationRepository());
-        $useCase->create(Uuid::fromString($request->request->get('bookId')), 'john@doe.com');
-
-        return new JsonResponse(null, Response::HTTP_CREATED);
-    }
-
-    /**
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function getReservationsAction(Request $request)
-    {
-        return new JsonResponse((new LocalListReservationsForBookProjection())->get(Uuid::fromString($request->query->get('bookId'))));
-    }
-
-    /**
-     * @param Request $request
-     * @return JsonResponse
-     */
-    public function putReservationsAction(Request $request)
-    {
-        $useCase = new GiveAwayBookInReservation(new LocalReservationRepository());
-        $useCase->giveAway($request->request->get('reservationId'));
+        try {
+            $this->library->giveAwayBookInReservation(Uuid::fromString($reservationId));
+        } catch (BookInReservationAlreadyGivenAway $e) {
+            return new JsonResponse(null, Response::HTTP_BAD_REQUEST);
+        }
 
         return new JsonResponse(null, Response::HTTP_OK);
     }
 
     /**
-     * @param Request $request
+     * @param $reservationId
+     * @return Response
+     */
+    public function deleteReservationsAction($reservationId)
+    {
+        $this->library->giveBackBookFromReservation(Uuid::fromString($reservationId));
+
+        return new Response(null, Response::HTTP_NO_CONTENT);
+    }
+
+    /**
+     * @param string  $bookId
      * @return JsonResponse
      */
-    public function deleteReservationsAction(Request $request)
+    public function getReservationsAction($bookId)
     {
-        $useCase = new GiveBackBookFromReservation(new LocalReservationRepository());
-        $useCase->giveBack($request->request->get('reservationId'));
-
-        return new JsonResponse(null, Response::HTTP_NO_CONTENT);
+        return new JsonResponse((new LocalListReservationsForBookProjection())->get(Uuid::fromString($bookId)));
     }
 }

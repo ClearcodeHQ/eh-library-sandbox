@@ -10,11 +10,11 @@
     }
   ],
   "autoload": {
-    "psr-4" : { "Clearcode\\EHLibrarySandbox\\": "src" }
+    "psr-4" : { "Clearcode\\EHLibrarySandbox\\Silex\\": "src" }
   },
   "autoload-dev": {
     "psr-4" : {
-      "tests\\Clearcode\\EHLibrarySandbox\\" : "tests"
+      "tests\\Clearcode\\EHLibrarySandbox\\Silex\\" : "tests"
     }
   },
   "minimum-stability": "dev",

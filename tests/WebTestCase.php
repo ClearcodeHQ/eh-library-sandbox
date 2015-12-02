@@ -1,7 +1,12 @@
 <?php
 
-namespace tests\Clearcode\EHLibrarySandbox;
+namespace tests\Clearcode\EHLibrarySandbox\Silex;
 
+use Clearcode\EHLibrary\Infrastructure\Persistence\LocalBookRepository;
+use Clearcode\EHLibrary\Infrastructure\Persistence\LocalReservationRepository;
+use Clearcode\EHLibrary\Model\Book;
+use Clearcode\EHLibrary\Model\Reservation;
+use Ramsey\Uuid\Uuid;
 use Silex\WebTestCase as BaseWebTestCase;
 use Symfony\Component\HttpKernel\Client;
 
@@ -11,6 +16,10 @@ abstract class WebTestCase extends BaseWebTestCase
     protected $client;
     /** @var array */
     protected $jsonResponseData;
+    /** @var LocalBookRepository */
+    private $books;
+    /** @var LocalReservationRepository */
+    private $reservations;
 
     /** {@inheritdoc} */
     public function setUp()
@@ -18,6 +27,11 @@ abstract class WebTestCase extends BaseWebTestCase
         parent::setUp();
 
         $this->client = $this->createClient();
+
+        $this->books = new LocalBookRepository();
+        $this->reservations = new LocalReservationRepository();
+
+        $this->clearDatabase();
     }
 
     /** {@inheritdoc} */
@@ -37,23 +51,53 @@ abstract class WebTestCase extends BaseWebTestCase
         $this->client = null;
         $this->jsonResponseData = null;
 
+        $this->books = null;
+        $this->reservations = null;
+
         parent::tearDown();
     }
 
-    protected function visitRoute($method, $routeName, array $routeParameters = array(), array $requestParameters = array())
+    protected function addBook($bookId, $title, $authors, $isbn)
     {
-        $this->visit($method, $this->app['url_generator']->generate($routeName, $routeParameters), $requestParameters);
+        $this->books->save(new Book(Uuid::fromString($bookId), $title, $authors, $isbn));
     }
 
-    protected function visit($method, $url, $requestParameters = array())
+    protected function addReservation($reservationId, $bookId, $givenAway = false)
+    {
+        $reservation = new Reservation(Uuid::fromString($reservationId), Uuid::fromString($bookId), 'john@doe.com');
+
+        if ($givenAway) {
+            $reservation->giveAway();
+        }
+
+        $this->reservations->save($reservation);
+    }
+
+    protected function request($method, $url, $requestParameters = array())
     {
         $this->client->request($method, $url, $requestParameters);
 
         $this->jsonResponseData = json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 
-    protected function assertThatResponseHasStatus($status)
+    protected function assertThatResponseHasStatus($expectedStatus)
     {
-        $this->assertEquals($status, $this->client->getResponse()->getStatusCode());
+        $this->assertEquals($expectedStatus, $this->client->getResponse()->getStatusCode());
+    }
+
+    protected function assertThatResponseHasContentType($expectedContentType)
+    {
+        $this->assertContains($expectedContentType, $this->client->getResponse()->headers->get('Content-Type'));
+    }
+
+    protected function assertThatResponseHasNotContentType()
+    {
+        $this->assertEmpty($this->client->getResponse()->headers->get('Content-Type'));
+    }
+
+    private function clearDatabase()
+    {
+        $this->books->clear();
+        $this->reservations->clear();
     }
 }
