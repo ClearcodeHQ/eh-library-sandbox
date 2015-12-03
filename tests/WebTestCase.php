@@ -62,12 +62,12 @@ abstract class WebTestCase extends BaseWebTestCase
         $this->books->save(new Book(Uuid::fromString($bookId), $title, $authors, $isbn));
     }
 
-    protected function addReservation($reservationId, $bookId, $givenAway = false)
+    protected function addReservation($reservationId, $bookId, \DateTime $givenAway = null)
     {
         $reservation = new Reservation(Uuid::fromString($reservationId), Uuid::fromString($bookId), 'john@doe.com');
 
-        if ($givenAway) {
-            $reservation->giveAway();
+        if (null !== $givenAway) {
+            $reservation->giveAway($givenAway);
         }
 
         $this->reservations->save($reservation);
